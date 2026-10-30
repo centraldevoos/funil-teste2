@@ -103,6 +103,8 @@
     if (evento === "inicio" || evento === "checkout") despachar(evento === "checkout");
   }
   const CUPOM = C.CUPOM || "BOASVINDAS";
+  // O link do checkout já abre com o cupom (?coupon=): os textos dizem "cupom aplicado" em vez de "aplique o cupom".
+  const CUPOM_APLICADO = !!C.CUPOM_APLICADO;
 
   // ---------- utilidades ----------
   const esperar = (ms) => new Promise((r) => setTimeout(r, ms * ritmo));
@@ -1548,7 +1550,9 @@
       '<div class="preco-de">De <s>R$ 67,06</s></div>' +
       '<div class="preco-por">R$ 30,18 <small>/ mês</small></div>' +
       '<div class="preco-nota">na assinatura anual</div>' +
-      '<div class="cupom"><div><span>🚨 Cupom exclusivo</span><strong>' + esc(CUPOM) + '</strong></div><button type="button" class="copiar">Copiar</button></div>' +
+      (CUPOM_APLICADO
+        ? '<div class="cupom"><div><span>✅ Cupom aplicado</span><strong>' + esc(CUPOM) + '</strong></div><span class="aplicado">Já vai no link</span></div>'
+        : '<div class="cupom"><div><span>🚨 Cupom exclusivo</span><strong>' + esc(CUPOM) + '</strong></div><button type="button" class="copiar">Copiar</button></div>') +
       '<div class="relogio" aria-live="off"><span>⚠️ O cupom é por tempo limitado</span><b class="tempo">15:00</b></div>' +
       '<a class="cta" href="#" target="_blank" rel="noopener">' + txt("botaoOferta", "Entrar para o VIP") + ' <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg></a>' +
       '<div class="aviso">O link do checkout ainda não foi configurado (LINK_CHECKOUT em config.js).</div>' +
@@ -1560,7 +1564,7 @@
     const rodapeEl = document.querySelector(".rodape");
     if (rodapeEl) rodapeEl.hidden = false;
     const copiar = oferta.querySelector(".copiar");
-    copiar.addEventListener("click", async () => {
+    if (copiar) copiar.addEventListener("click", async () => {
       try { await navigator.clipboard.writeText(CUPOM); copiar.textContent = "Copiado ✓"; } catch (e) { copiar.textContent = CUPOM; }
       registrar("copiou_cupom", {});
     });
@@ -1590,16 +1594,20 @@
       clicou = true;
       await esperar(2500);
       emFila(async () => {
-        await ele("🚨Não se esqueça de aplicar seu CUPOM no link acima para receber seu desconto!!!");
-        await ele("INSIRA SEU *CUPOM* DESSA FORMA 👇");
-        await foto(IMG.comoAplicarCupom, "Clique em *APLICAR CUPOM* e escreva *" + CUPOM + "*.", "Onde aplicar o cupom no checkout");
+        if (CUPOM_APLICADO) {
+          await ele("✅ Seu cupom *" + CUPOM + "* já está aplicado no link: o desconto aparece direto no checkout, é só finalizar!");
+        } else {
+          await ele("🚨Não se esqueça de aplicar seu CUPOM no link acima para receber seu desconto!!!");
+          await ele("INSIRA SEU *CUPOM* DESSA FORMA 👇");
+          await foto(IMG.comoAplicarCupom, "Clique em *APLICAR CUPOM* e escreva *" + CUPOM + "*.", "Onde aplicar o cupom no checkout");
+        }
         await ele("Caso tenha alguma dúvida, me avisa aqui!");
       });
     });
     // Funil frio: lembrete em 60 s, grupo gratuito em 90 s (se não clicou no VIP) e dúvidas em 150 s.
     setTimeout(() => emFila(async () => {
       if (clicou) return;
-      await ele("Lembrando que esse desconto é exclusivo e só fica liberado por *poucos minutos*, não esqueça de aplicar o CUPOM!");
+      await ele(CUPOM_APLICADO ? "Lembrando que esse desconto é exclusivo e só fica liberado por *poucos minutos*. O cupom já está aplicado no link, é só finalizar!" : "Lembrando que esse desconto é exclusivo e só fica liberado por *poucos minutos*, não esqueça de aplicar o CUPOM!");
       await ele("depois você só consegue comprar o acesso quando abrirmos as vagas novamente e com o valor normal 🙁");
     }), (FRIO ? 60000 : 90000) * ritmo);
     if (FRIO) setTimeout(() => emFila(() => (clicou ? null : oferecerGrupo("nao_comprou"))), 90000 * ritmo);
@@ -1698,7 +1706,7 @@
       restantes.splice(i, 1);
       if (restantes.length || !mostrouAtendente) await ele("Mais alguma dúvida?", 700);
     }
-    await ele("Então bora! É só tocar no botão e aplicar o cupom *" + CUPOM + "* 👇");
+    await ele(CUPOM_APLICADO ? "Então bora! É só tocar no botão: o cupom *" + CUPOM + "* já vai aplicado 👇" : "Então bora! É só tocar no botão e aplicar o cupom *" + CUPOM + "* 👇");
     const botao = cta.cloneNode(true);
     botao.addEventListener("click", (e) => { e.preventDefault(); cta.click(); });
     const caixa = document.createElement("div");

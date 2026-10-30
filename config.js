@@ -7,8 +7,10 @@ window.CONFIG = {
 
   // Link do checkout do VIP na Hub.la (o padrão, sem order bump). O teste "orderbump-v1" abaixo troca o link por versão.
   // Vazio = botão mostra um aviso.
-  LINK_CHECKOUT: "https://pay.hub.la/Muxrk9khr04JS10t58pm",
+  LINK_CHECKOUT: "https://pay.hub.la/qhHtgSpZBbPMFaVspJvT?coupon=BOASVINDAS",
   CUPOM: "BOASVINDAS",
+  // O link do checkout já vem com o cupom aplicado (?coupon=BOASVINDAS): os textos dizem "cupom aplicado".
+  CUPOM_APLICADO: true,
   // Funil frio (?f=voar, live do Instagram): página de entrada no grupo gratuito, oferecida a quem trava no meio
   // ou não compra em 90 s. Vazio = não oferece.
   LINK_GRUPO_GRATIS: "https://grupogratuito.centraldevoos.com/",
