@@ -518,16 +518,16 @@
     await esperar(500);
   }
   function contar(el, ate, ms) {
-    const ini = performance.now(), dur = (ms || 1700) * ritmo;
-    // O relógio é sempre o performance.now(): o horário que o requestAnimationFrame entrega pode vir em outra base
-    // em alguns celulares (era isso que fazia o contador mostrar números absurdos). E o valor fica sempre entre 0 e o final.
-    (function passo() {
-      const p = Math.max(0, Math.min((performance.now() - ini) / dur, 1)), e = 1 - Math.pow(1 - p, 4);
-      el.textContent = Math.max(0, Math.min(ate, Math.round(ate * e))).toLocaleString("pt-BR");
-      if (p < 1) requestAnimationFrame(passo);
-    })();
-    // Garante o número final mesmo se a aba estiver em segundo plano (o navegador pausa a animação).
-    setTimeout(() => (el.textContent = Math.round(ate).toLocaleString("pt-BR")), dur + 50);
+    // Conta subindo com um relógio próprio (não depende do requestAnimationFrame, que alguns celulares pulam ou
+    // pausam): acelera no começo e desacelera no fim, e o número nunca passa do final nem volta.
+    const fim = Math.max(0, Math.round(ate)), dur = (ms || 1700) * ritmo, ini = Date.now();
+    let atual = 0;
+    el.textContent = "0";
+    const t = setInterval(() => {
+      const p = Math.min((Date.now() - ini) / dur, 1), alvo = Math.round(fim * (1 - Math.pow(1 - p, 3)));
+      if (alvo > atual) { atual = alvo; el.textContent = atual.toLocaleString("pt-BR"); }
+      if (p >= 1) { clearInterval(t); el.textContent = fim.toLocaleString("pt-BR"); }
+    }, 40);
   }
   // Contagem regressiva de 15 minutos a partir do momento em que a oferta aparece.
   function relogio15(el) {
@@ -569,6 +569,13 @@
     { icone: "🎓", titulo: "Curso completo de milhas", texto: "Vídeo aulas bem explicativas de como decolar no mundo das milhas." },
     { icone: "⚖️", titulo: "Advogada do viajante", texto: "Suporte <b>individual</b> com a nossa advogada especializada em direito do viajante." },
     { icone: "🚀", titulo: "Grupo de Estratégias", texto: "Como acumular e multiplicar milhas, cartões, salas VIP e oportunidades em primeira mão." },
+  ];
+  // Funil frio: o que é a Comunidade VIP, em 4 passos (antes da comparação).
+  const EXPLICA_VIP = [
+    ["🔎", "A gente procura por você", "O nosso sistema e a nossa equipe vasculham as promoções de passagem o dia inteiro."],
+    ["📲", "Chega no seu WhatsApp", "Mais de 150 promoções por dia, num grupo com os voos saindo da sua região."],
+    ["💳", "Você compra sem milhas", "No Pix ou no cartão, com a passagem no seu nome, direto no site da companhia aérea."],
+    ["🔔", "Avisamos quando baixa", "Na nossa plataforma você monitora a sua viagem e recebe o aviso quando o preço cai."],
   ];
   // Funil frio: no lugar do Grupo Grátis (que essa pessoa nem conhece), o jeito de sempre de procurar passagem.
   const SOZINHO = [
@@ -1366,7 +1373,7 @@
       await ele("Perfeito! Então você já consegue aproveitar as passagens com milhas..");
       await ele("O grande problema que você deve enfrentar então é encontrar essas passagens, que ficam escondidas para o destino que você quer, e na data que pode ir...");
       await ele("lembrando que você n pode demorar muito, pq essas promoções Awards acabam bem rápido");
-      await ele("ainda bem que temos uma Comunidade VIP, lá são enviadas mais de 150 promoções todos os dias!");
+      await ele(FRIO ? "ainda bem que temos a nossa *Comunidade VIP*: é o nosso grupo de promoções no WhatsApp, onde a gente manda mais de 150 promoções todos os dias!" : "ainda bem que temos uma Comunidade VIP, lá são enviadas mais de 150 promoções todos os dias!");
       await opcoes([{ texto: "Quero saber mais!", principal: true }]);
     } else {
       if (milhas.texto === "SIM, poucas") {
@@ -1376,7 +1383,7 @@
         await ele("Caramba, ainda não? Você ta deixando de viajar de graça por isso");
       }
       await ele("mas tudo bem, conseguimos te ajudar");
-      await ele("na nossa Comunidade VIP você pode comprar as passagens usando Cartão ou PIX, sem ter milhas");
+      await ele(FRIO ? "na nossa *Comunidade VIP*, que é o nosso grupo de promoções no WhatsApp, você compra as passagens no Cartão ou PIX, sem ter milhas" : "na nossa Comunidade VIP você pode comprar as passagens usando Cartão ou PIX, sem ter milhas");
       await ele("isso é incrível né? 😁");
       await opcoes([{ texto: "SIM vou viajar muito", principal: true }]);
       etapa(3);
@@ -1406,6 +1413,20 @@
       await opcoes([{ texto: "Pode sim!", principal: true }]);
     }
     etapa(3);
+
+    // Funil frio: quem não conhece a Central entende o que é a Comunidade VIP antes de ver a comparação.
+    if (FRIO) {
+      await ele("Antes, deixa eu te explicar rapidinho *como funciona a Comunidade VIP* 👇");
+      await cartao(
+        '<p class="titulo">Comunidade VIP Central de Voos 👑</p><ol class="explica">' +
+        EXPLICA_VIP.map((e, i) => '<li style="animation-delay:' + (0.3 + i * 0.9) + 's"><span class="ic">' + e[0] + '</span><div><b>' + esc(e[1]) + '</b><span class="t">' + esc(e[2]) + '</span></div></li>').join("") +
+        "</ol>",
+        "cartao", 900
+      );
+      await esperar(4200);
+      await ele("É como ter uma *equipe caçando passagem barata pra você*, todos os dias 🙌");
+      await ele("Agora olha o que muda quando você para de procurar sozinho 👇");
+    }
 
     // Grátis × VIP.
     await digitando(1200);
