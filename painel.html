@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Painel do funil | Central de Voos</title>
+<link rel="icon" href="midia/logo-avatar.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* Painel interno do funil interativo: visitas, etapas, teste A/B, respostas, tráfego e horários. */
+  :root {
+    color-scheme: light;
+    --fundo: #f6f7f9; --superficie: #fff; --linha: #e6e8ec; --grade: #eef0f3; --tinta: #15171a; --tinta-2: #3d424a; --suave: #646a73;
+    --azul: #2457d6; --azul-fundo: #edf2fd; --verde: #138a57; --verde-fundo: #e9f6ef; --vermelho: #b4233c; --vermelho-fundo: #fbecef;
+    /* versões do teste A/B, em ordem fixa (validadas: daltonismo e contraste) */
+    --a: #2457d6; --b: #d97706; --c: #7c3aed; --d: #0d9488;
+    --r: 16px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--fundo); color: var(--tinta); font: 15px/1.5 "Geist", -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+  .topo { position: sticky; top: 0; z-index: 5; background: var(--superficie); border-bottom: 1px solid var(--linha); }
+  .topo-in { max-width: 1120px; margin: 0 auto; padding: 12px max(16px, env(safe-area-inset-left)); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .marca { display: flex; align-items: center; gap: 10px; margin-right: auto; }
+  .marca img { width: 36px; height: 36px; border-radius: 10px; background: #1b1b1b; }
+  .marca strong { display: block; font-size: 16px; letter-spacing: -.01em; }
+  .marca span { font-size: 12.5px; color: var(--suave); }
+  .filtros { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  select, .chave { font: inherit; font-size: 14px; color: var(--tinta); background: var(--superficie); border: 1px solid var(--linha); border-radius: 10px; padding: 8px 10px; min-height: 40px; }
+  .chave { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+  main { max-width: 1120px; margin: 0 auto; padding: 20px max(16px, env(safe-area-inset-left)) 48px; display: grid; gap: 16px; }
+  .grade-2 { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  .cartao { background: var(--superficie); border: 1px solid var(--linha); border-radius: var(--r); padding: 18px; min-width: 0; }
+  .cartao h2 { margin: 0 0 4px; font-size: 16px; letter-spacing: -.01em; }
+  .cartao .sub { margin: 0 0 14px; color: var(--suave); font-size: 13.5px; }
+  /* números grandes */
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .kpi { background: var(--superficie); border: 1px solid var(--linha); border-radius: var(--r); padding: 14px 16px; }
+  .kpi span { display: block; font-size: 13px; color: var(--suave); }
+  .kpi b { display: block; font-size: clamp(26px, 6vw, 32px); font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1.15; margin-top: 4px; }
+  .kpi small { display: block; font-size: 12.5px; color: var(--suave); }
+  .delta { font-size: 12.5px; font-weight: 600; margin-top: 4px; display: inline-flex; gap: 4px; align-items: center; color: var(--tinta-2); }
+  .delta.sobe::before { content: "▲"; color: var(--verde); font-size: 10px; }
+  .delta.desce::before { content: "▼"; color: var(--vermelho); font-size: 10px; }
+  /* gráfico de colunas (uma série; detalhes no tooltip) */
+  .colunas { display: flex; align-items: flex-end; justify-content: space-between; gap: 3px; height: 180px; padding: 0 0 4px; border-bottom: 1px solid var(--linha); position: relative; }
+  .colunas .col { flex: 1; min-width: 0; max-width: 64px; height: 100%; display: flex; align-items: flex-end; cursor: default; }
+  .colunas .col i { display: block; width: 100%; background: var(--azul); border-radius: 4px 4px 0 0; min-height: 2px; transition: opacity .15s; }
+  .colunas .col:hover i { opacity: .75; }
+  .eixo { display: flex; justify-content: space-between; color: var(--suave); font-size: 12px; margin-top: 6px; }
+  .escala { position: absolute; left: 0; top: -2px; font-size: 11.5px; color: var(--suave); background: var(--superficie); padding: 0 6px 0 0; }
+  /* veredito A/B */
+  .veredito { display: flex; gap: 12px; align-items: flex-start; }
+  .veredito .ic { flex: none; width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; font-size: 18px; background: var(--azul-fundo); }
+  .veredito.ganhou .ic { background: var(--verde-fundo); }
+  .veredito p { margin: 0; }
+  .veredito .t { font-weight: 650; }
+  .veredito .s { color: var(--suave); font-size: 13.5px; margin-top: 2px; }
+  /* mapa de calor */
+  .calor-grade { display: grid; grid-template-columns: minmax(220px, 300px) 1fr; gap: 28px; align-items: start; margin-top: 14px; }
+  .calor-fig { margin: 0; }
+  .calor-quadro { position: relative; width: 100%; border: 1.5px solid var(--linha); border-radius: 22px; overflow: hidden; background: #fafafa; }
+  .calor-quadro.oferta { border-radius: 18px; background: #fff; }
+  .calor-quadro canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
+  .esq { position: absolute; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #9aa0a8; text-align: center; line-height: 1.2; padding: 2px; }
+  .esq.linha-cinza { background: #eceef1; }
+  .esq.escura { background: #c9ccd1; color: #fff; }
+  .esq.topo-tela { background: #fff; border-bottom: 1px solid var(--linha); border-radius: 0; justify-content: flex-start; padding-left: 12px; }
+  .esq.contorno { border: 1px dashed #d5d8dc; }
+  .calor-fig figcaption { margin-top: 10px; font-size: 12.5px; color: var(--suave); }
+  .calor-escala { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .calor-escala i { flex: 1; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #fed7aa, #fb923c, #ea580c, #9a3412); }
+  .calor-lista table td small { color: var(--suave); }
+  .tag-morto { display: inline-block; font-size: 11px; font-weight: 600; color: #9a3412; background: #fff1e6; border-radius: 99px; padding: 1px 7px; margin-left: 6px; white-space: nowrap; }
+  .tag-raiva { display: inline-block; font-size: 11px; font-weight: 600; color: var(--vermelho); background: #fdecec; border-radius: 99px; padding: 1px 7px; margin-left: 6px; white-space: nowrap; }
+  .calor-resumo { margin: 0 0 10px; font-size: 14px; }
+  @media (max-width: 760px) { .calor-grade { grid-template-columns: 1fr; } .calor-fig { max-width: 280px; margin: 0 auto; } }
+  .sub-ab { font-size: 15px; margin: 22px 0 8px; }
+  .nota-ab { margin: 10px 0 0; }
+  /* funil */
+  .legenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--tinta-2); margin-bottom: 10px; }
+  .legenda i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .tabela { width: 100%; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .funil table { min-width: 620px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--linha); vertical-align: middle; }
+  th { font-size: 12px; font-weight: 600; color: var(--suave); text-transform: uppercase; letter-spacing: .04em; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr.opcional td:first-child { color: var(--suave); }
+  .etapa-nome { display: flex; flex-direction: column; }
+  .etapa-nome small, td small { color: var(--suave); font-size: 12px; }
+  .barra { height: 8px; background: var(--grade); border-radius: 99px; overflow: hidden; min-width: 70px; }
+  .barra i { display: block; height: 100%; border-radius: 99px; }
+  .queda { font-size: 12px; color: var(--vermelho); }
+  .queda.maior { background: var(--vermelho-fundo); padding: 1px 6px; border-radius: 6px; font-weight: 600; }
+  /* respostas */
+  .respostas { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  .pergunta h3 { margin: 0 0 10px; font-size: 14px; }
+  .opcao-resp { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; font-size: 13.5px; margin-bottom: 9px; }
+  .opcao-resp .nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .opcao-resp .val { color: var(--tinta-2); font-variant-numeric: tabular-nums; }
+  .opcao-resp .barra { grid-column: 1 / -1; height: 6px; }
+  .opcao-resp .barra i { background: var(--azul); }
+  .vazio { text-align: center; color: var(--suave); padding: 28px 12px; }
+  .vazio.peq { padding: 12px 0; text-align: left; font-size: 13.5px; }
+  .dispositivos { display: grid; gap: 10px; }
+  .disp { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 10px 12px; border: 1px solid var(--linha); border-radius: 12px; }
+  .disp b { font-size: 20px; font-variant-numeric: tabular-nums; }
+  .abas { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .abas button { font: inherit; font-size: 13.5px; border: 1px solid var(--linha); background: var(--superficie); color: var(--tinta-2); border-radius: 99px; padding: 6px 12px; cursor: pointer; min-height: 34px; }
+  .abas button[aria-selected="true"] { background: var(--tinta); border-color: var(--tinta); color: #fff; }
+  .rodape { color: var(--suave); font-size: 12.5px; text-align: center; }
+  .erro { color: var(--vermelho); }
+  /* tooltip */
+  .dica { position: fixed; z-index: 20; pointer-events: none; background: var(--tinta); color: #fff; font-size: 12.5px; line-height: 1.45; padding: 8px 10px; border-radius: 10px; box-shadow: 0 8px 24px -8px rgba(0,0,0,.4); opacity: 0; transition: opacity .1s; max-width: 240px; }
+  .dica b { font-weight: 650; }
+  @media (max-width: 640px) { .marca { width: 100%; } .filtros { width: 100%; } .filtros select { flex: 1; min-width: 0; } .colunas { height: 140px; } }
+</style>
+</head>
+<body>
+  <header class="topo"><div class="topo-in">
+    <div class="marca"><img src="midia/logo-avatar.png" alt=""><div><strong id="tituloPainel">Painel do funil</strong><span id="subPainel">Diagnóstico de economia · métricas, etapas e testes A/B</span></div></div>
+    <div class="filtros">
+      <select id="dias" aria-label="Período"><option value="1">Últimas 24 h</option><option value="7" selected>Últimos 7 dias</option><option value="30">Últimos 30 dias</option><option value="90">Últimos 90 dias</option></select>
+      <select id="experimento" aria-label="Teste A/B"></select>
+      <select id="fonte" aria-label="Origem do tráfego"></select>
+      <label class="chave"><input type="checkbox" id="teste"> Dados de teste</label>
+    </div>
+  </div></header>
+  <main>
+    <section class="kpis" id="kpis"></section>
+    <section class="cartao"><h2 id="tituloSerie">Visitas por dia</h2><p class="sub">Passe o dedo ou o mouse nas colunas pra ver visitas, ofertas e checkouts.</p><div id="serie"></div></section>
+    <section class="cartao" id="ab"></section>
+    <section class="cartao funil">
+      <h2>Funil por etapa</h2>
+      <p class="sub">Pessoas (sessões) que chegaram em cada etapa. A porcentagem é sobre quem abriu o site; em vermelho, quantos pararam ali. "Tempo" é a mediana desde que a pessoa abriu o site.</p>
+      <div class="legenda" id="legenda"></div>
+      <div class="tabela" id="funil"></div>
+    </section>
+    <section class="cartao">
+      <h2>Mapa de calor</h2>
+      <p class="sub">Onde as pessoas tocam: quanto mais escuro, mais toques. Passe o dedo ou o mouse no mapa pra ver os números. Ao lado, o que foi tocado, com destaque pros toques em coisas que não são botão (sinal de que a pessoa achou que era clicável).</p>
+      <div class="abas" role="tablist" id="abasCalor">
+        <button type="button" role="tab" data-tipo="tela" aria-selected="true">Tela do celular</button>
+        <button type="button" role="tab" data-tipo="oferta" aria-selected="false">Cartão da oferta</button>
+      </div>
+      <div class="calor-grade">
+        <figure class="calor-fig"><div class="calor-quadro" id="calorQuadro"></div><figcaption id="calorLegenda"></figcaption></figure>
+        <div class="calor-lista" id="calorLista"></div>
+      </div>
+    </section>
+    <section class="cartao">
+      <h2>O que as pessoas responderam</h2>
+      <p class="sub">Respostas de cada pergunta no período (pessoas que escolheram cada opção).</p>
+      <div class="respostas" id="respostas"></div>
+    </section>
+    <section class="cartao">
+      <h2>De onde vêm as vendas</h2>
+      <p class="sub">Visitas e conversão por origem, campanha e anúncio (pelos parâmetros utm do link).</p>
+      <div class="abas" role="tablist" id="abasTrafego">
+        <button type="button" role="tab" data-tipo="fonte" aria-selected="true">Origem</button>
+        <button type="button" role="tab" data-tipo="campanha" aria-selected="false">Campanha</button>
+        <button type="button" role="tab" data-tipo="anuncio" aria-selected="false">Anúncio</button>
+      </div>
+      <div class="tabela" id="trafego"></div>
+    </section>
+    <div class="grade-2">
+      <section class="cartao"><h2>Celular × computador</h2><p class="sub">Visitas e quantas foram pro checkout.</p><div class="dispositivos" id="dispositivos"></div></section>
+      <section class="cartao"><h2>Horário das visitas</h2><p class="sub">Hora de Brasília em que as pessoas abriram o site.</p><div id="horas"></div></section>
+    </div>
+    <p class="rodape" id="rodape">Carregando…</p>
+  </main>
+  <div class="dica" id="dica" role="tooltip"></div>
+<script>
+  // Endereço da função que devolve as métricas (Supabase, projeto CDV Financeiro).
+  const API = "https://qjyswtxspktkqoyqjjwp.supabase.co/functions/v1/funil-metricas";
+  // Cada funil tem o seu painel: o do repo funil-teste2 (ou ?funil=diagnostico2) mostra só o diagnóstico 2 (live do Instagram).
+  const FUNIL = /funil-teste2|diagnostico2/.test(location.pathname) || new URLSearchParams(location.search).get("funil") === "diagnostico2" ? "diagnostico2" : "diagnostico";
+  if (FUNIL === "diagnostico2") {
+    document.title = "Painel do diagnóstico 2 | Central de Voos";
+    document.getElementById("tituloPainel").textContent = "Painel do diagnóstico 2";
+    document.getElementById("subPainel").textContent = "Live do Instagram (centraldevoos.com/diagnostico2) · métricas e etapas";
+  }
+  // Etapas do funil, na ordem. "opcional" = nem todo mundo passa (quem chega com telefone no link pula a cidade).
+  const ETAPAS = [
+    { ev: "inicio", nome: "Abriu o site" },
+    { ev: "aceitou", nome: "Tocou em \"SIM, Claro!\"" },
+    { ev: "etapa", n: 1, nome: "Disse o nome" },
+    { ev: "etapa", n: 2, nome: "Disse onde compra passagens" },
+    { ev: "etapa", n: 3, nome: "Respondeu sobre milhas", det: "e viu a história de Paris" },
+    { ev: "etapa", n: 4, nome: "Tocou em \"Quero ser VIP\"", det: "depois das vantagens e bônus" },
+    { ev: "etapa", n: 5, nome: "Escolheu o destino" },
+    { ev: "etapa", n: 6, nome: "Disse quando viaja" },
+    { ev: "etapa", n: 7, nome: "Disse quantas pessoas" },
+    { ev: "etapa", n: 8, nome: "Disse a cidade de saída", det: "só quem chega sem telefone no link", opcional: true },
+    { ev: "promo_exemplo", nome: "Viu a promoção" },
+    { ev: "resultado", nome: "Viu a economia" },
+    { ev: "abriu_presente", nome: "Abriu o presente" },
+    { ev: "oferta", nome: "Viu a oferta" },
+    { ev: "checkout", nome: "Clicou em \"Entrar para o VIP\"", det: "foi pro checkout" },
+    { ev: "copiou_cupom", nome: "Copiou o cupom", opcional: true },
+    { ev: "atendente", nome: "Chamou o atendente no WhatsApp", det: "pela lista de dúvidas", opcional: true },
+  ];
+  const PERGUNTAS = [
+    ["onde_compra", "Onde costuma comprar passagens"], ["milhas", "Tem milhas?"], ["destino", "Destinos escolhidos"],
+    ["quando", "Quando pretende viajar"], ["pessoas", "Quantas pessoas viajam"], ["origem", "Cidade de saída"], ["duvida", "Dúvidas que mais tocaram"],
+  ];
+  const CORES = ["var(--a)", "var(--b)", "var(--c)", "var(--d)"];
+  // O que cada versão de cada teste significa (igual ao config.js do site).
+  const ROTULOS = {
+    "abertura-v1": { A: "2 bolhas (as de sempre)", B: "3 bolhas curtas" },
+    "orderbump-v1": { A: "sem order bump", B: "com order bump" },
+  };
+  const rotulo = (v) => { const r = (ROTULOS[$("experimento").value] || {})[v]; return "Versão " + esc(v) + (r ? " · " + esc(r) : ""); };
+  const reais = (n) => "R$ " + Number(n || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n) => Number(n || 0).toLocaleString("pt-BR");
+  const pct = (a, b) => (b ? (a / b) * 100 : 0);
+  const pctTxt = (v) => v.toLocaleString("pt-BR", { maximumFractionDigits: v < 10 ? 1 : 0 }) + "%";
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const tempo = (s) => (s == null ? "—" : s < 60 ? Math.round(s) + " s" : Math.floor(s / 60) + " min " + String(Math.round(s % 60)).padStart(2, "0") + " s");
+
+  // Tooltip: qualquer elemento com data-dica mostra o texto (HTML) ao passar o mouse ou tocar.
+  const dica = $("dica");
+  function mostrarDica(e) {
+    const alvo = e.target.closest("[data-dica]");
+    if (!alvo) { dica.style.opacity = 0; return; }
+    dica.innerHTML = alvo.getAttribute("data-dica");
+    const x = (e.touches ? e.touches[0].clientX : e.clientX), y = (e.touches ? e.touches[0].clientY : e.clientY);
+    const w = dica.offsetWidth, h = dica.offsetHeight;
+    dica.style.left = Math.min(Math.max(8, x - w / 2), innerWidth - w - 8) + "px";
+    dica.style.top = Math.max(8, y - h - 14) + "px";
+    dica.style.opacity = 1;
+  }
+  document.addEventListener("mousemove", mostrarDica);
+  document.addEventListener("touchstart", mostrarDica, { passive: true });
+  document.addEventListener("scroll", () => (dica.style.opacity = 0), { passive: true });
+
+  // Confiança do teste A/B entre duas taxas (teste de duas proporções).
+  function phi(z) { const t = 1 / (1 + 0.2316419 * Math.abs(z)), d = 0.3989423 * Math.exp(-z * z / 2), p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274)))); return z > 0 ? 1 - p : p; }
+  function comparar(c1, n1, c2, n2) {
+    if (!n1 || !n2) return null;
+    const p1 = c1 / n1, p2 = c2 / n2, p = (c1 + c2) / (n1 + n2), se = Math.sqrt(p * (1 - p) * (1 / n1 + 1 / n2));
+    if (!se) return { p1, p2, conf: 0 };
+    return { p1, p2, conf: 1 - 2 * (1 - phi(Math.abs((p2 - p1) / se))) };
+  }
+
+  function preencherFiltros(filtros) {
+    const sel = (id, tipo, primeiro) => {
+      const el = $(id), atual = el.value;
+      const valores = filtros.filter((f) => f.tipo === tipo).sort((a, b) => b.sessoes - a.sessoes);
+      el.innerHTML = '<option value="">' + primeiro + "</option>" + valores.map((f) => '<option value="' + esc(f.valor) + '">' + esc(f.valor) + " (" + fmt(f.sessoes) + ")</option>").join("");
+      if ([...el.options].some((o) => o.value === atual)) el.value = atual;
+    };
+    sel("experimento", "experimento", "Todos os testes");
+    sel("fonte", "fonte", "Todas as origens");
+  }
+
+  function kpis(d) {
+    const at = (d.resumo || []).find((r) => r.periodo === "atual") || {}, an = (d.resumo || []).find((r) => r.periodo === "anterior") || {};
+    const v = +at.visitas || 0, o = +at.ofertas || 0, c = +at.checkouts || 0, va = +an.visitas || 0, oa = +an.ofertas || 0, ca = +an.checkouts || 0;
+    const delta = (agora, antes, ehTaxa) => {
+      if (!antes) return '<span class="delta">sem dado no período anterior</span>';
+      const dif = ehTaxa ? agora - antes : pct(agora - antes, antes);
+      const txt = ehTaxa ? (dif >= 0 ? "+" : "") + dif.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " p.p." : (dif >= 0 ? "+" : "") + Math.round(dif) + "%";
+      return '<span class="delta ' + (dif > 0 ? "sobe" : dif < 0 ? "desce" : "") + '">' + txt + " vs período anterior</span>";
+    };
+    $("kpis").innerHTML = [
+      ["Visitas", fmt(v), "abriram o site", delta(v, va)],
+      ["Viram a oferta", fmt(o), pctTxt(pct(o, v)) + " das visitas", delta(o, oa)],
+      ["Foram pro checkout", fmt(c), pctTxt(pct(c, v)) + " das visitas", delta(c, ca)],
+      ["Conversão do funil", pctTxt(pct(c, v)), "checkout ÷ visitas", delta(pct(c, v), va ? pct(ca, va) : 0, true)],
+    ].map(([t, n, s, dl]) => '<div class="kpi"><span>' + t + "</span><b>" + n + "</b><small>" + s + "</small>" + dl + "</div>").join("");
+  }
+
+  function serie(d) {
+    const porHora = d.dias <= 1, agora = new Date();
+    $("tituloSerie").textContent = porHora ? "Visitas por hora" : "Visitas por dia";
+    // todos os dias (ou horas) do período, com zero onde não teve visita
+    const chaveDe = (dt) => porHora ? dt.getFullYear() + "-" + dt.getMonth() + "-" + dt.getDate() + "-" + dt.getHours() : dt.getFullYear() + "-" + dt.getMonth() + "-" + dt.getDate();
+    const mapa = {};
+    for (const p of d.serie || []) mapa[chaveDe(new Date(p.quando))] = p;
+    const n = porHora ? 24 : d.dias, pontos = [];
+    for (let i = n - 1; i >= 0; i--) {
+      const dt = new Date(agora);
+      if (porHora) dt.setHours(agora.getHours() - i, 0, 0, 0); else { dt.setHours(0, 0, 0, 0); dt.setDate(agora.getDate() - i); }
+      const p = mapa[chaveDe(dt)] || {};
+      pontos.push({ quando: dt, visitas: +p.visitas || 0, ofertas: +p.ofertas || 0, checkouts: +p.checkouts || 0 });
+    }
+    if (!pontos.some((p) => p.visitas)) { $("serie").innerHTML = '<div class="vazio">Sem visitas nesse período.</div>'; return; }
+    const max = Math.max(1, ...pontos.map((p) => p.visitas));
+    const rot = (dt) => porHora ? String(dt.getHours()).padStart(2, "0") + "h" : dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+    $("serie").innerHTML = '<div class="colunas"><span class="escala">máx. ' + fmt(max) + "</span>" + pontos.map((p) =>
+      '<div class="col" data-dica="<b>' + rot(p.quando) + "</b><br>" + fmt(p.visitas) + " visitas<br>" + fmt(p.ofertas) + " viram a oferta<br>" + fmt(p.checkouts) + ' checkouts"><i style="height:' + ((p.visitas / max) * 100).toFixed(1) + '%"></i></div>').join("") +
+      '</div><div class="eixo"><span>' + rot(pontos[0].quando) + "</span><span>" + rot(pontos[pontos.length - 1].quando) + "</span></div>";
+  }
+
+  function funilEab(d) {
+    const contagem = {};
+    for (const l of d.linhas || []) {
+      const v = l.variante || "A", k = l.evento === "etapa" ? "etapa" + l.etapa : l.evento;
+      contagem[v] = contagem[v] || {};
+      contagem[v][k] = (contagem[v][k] || 0) + Number(l.sessoes); // soma os testes quando o filtro é "todos"
+    }
+    const tempos = {};
+    for (const t of d.tempos || []) tempos[t.evento === "etapa" ? "etapa" + t.etapa : t.evento] = t.mediana_s == null ? null : +t.mediana_s;
+    const variantes = Object.keys(contagem).sort();
+    const chave = (e) => (e.ev === "etapa" ? "etapa" + e.n : e.ev);
+    if (!variantes.length) {
+      $("ab").innerHTML = '<h2>Teste A/B</h2><div class="vazio">Ainda não há visitas nesse período' + ($("teste").checked ? " (dados de teste)" : "") + ".<br>Assim que o funil receber tráfego, os números aparecem aqui.</div>";
+      $("funil").innerHTML = ""; $("legenda").innerHTML = "";
+      return;
+    }
+    // A/B: taxa de checkout por versão
+    let ab;
+    if (variantes.length < 2) {
+      ab = '<div class="veredito"><div class="ic">🧪</div><div><p class="t">Só uma versão nesse filtro</p><p class="s">Escolha um teste com duas versões (A e B) pra comparar.</p></div></div>';
+    } else {
+      const taxas = variantes.map((v) => ({ v, n: contagem[v].inicio || 0, c: contagem[v].checkout || 0 })).sort((a, b) => pct(b.c, b.n) - pct(a.c, a.n));
+      const [melhor, segundo] = taxas, r = comparar(segundo.c, segundo.n, melhor.c, melhor.n);
+      const pouco = Math.min(melhor.n, segundo.n) < 100, dif = r && r.p1 ? ((r.p2 - r.p1) / r.p1) * 100 : 0, conf = r ? Math.round(r.conf * 100) : 0;
+      const ganhou = !pouco && conf >= 95;
+      const titulo = ganhou ? "Versão " + melhor.v + " está ganhando" : pouco ? "Ainda é cedo pra decidir" : "Empate técnico por enquanto";
+      const sub = taxas.map((t) => "<b>" + t.v + "</b>: " + pctTxt(pct(t.c, t.n)) + " (" + fmt(t.c) + " de " + fmt(t.n) + ")").join(" · ") +
+        (r && r.p1 ? " — " + melhor.v + " está " + Math.round(Math.abs(dif)) + "% acima, com " + conf + "% de confiança." : ".") +
+        (pouco ? " Espere pelo menos 100 visitas em cada versão." : ganhou ? " Já dá pra ficar com a versão " + melhor.v + "." : " Deixe rodar mais; o ideal é chegar a 95% de confiança.");
+      ab = '<div class="veredito' + (ganhou ? " ganhou" : "") + '"><div class="ic">' + (ganhou ? "🏆" : "🧪") + '</div><div><p class="t">' + titulo + '</p><p class="s">Taxa de checkout (checkout ÷ visitas) — ' + sub + "</p></div></div>";
+    }
+    $("ab").innerHTML = "<h2>Teste A/B</h2>" + ab + vendasHub(d, contagem);
+    // Funil
+    $("legenda").innerHTML = variantes.map((v, i) => '<span><i style="background:' + CORES[i % CORES.length] + '"></i>' + rotulo(v) + " · " + fmt(contagem[v].inicio || 0) + " visitas</span>").join("");
+    const maiorQueda = {};
+    for (const v of variantes) {
+      let ant = null, max = 0;
+      for (const e of ETAPAS) { if (e.opcional) continue; const n = contagem[v][chave(e)] || 0; if (ant > 0) { const q = pct(ant - n, ant); if (q > max) { max = q; maiorQueda[v] = chave(e); } } ant = n; }
+    }
+    let html = '<table><thead><tr><th>Etapa</th><th class="num">Tempo</th>' + variantes.map((v) => '<th class="num">Versão ' + esc(v) + "</th><th></th>").join("") + "</tr></thead><tbody>";
+    const anterior = {};
+    for (const e of ETAPAS) {
+      const k = chave(e);
+      html += '<tr class="' + (e.opcional ? "opcional" : "") + '"><td><div class="etapa-nome">' + esc(e.nome) + (e.det ? "<small>" + esc(e.det) + "</small>" : "") + '</div></td><td class="num"><small>' + (k === "inicio" ? "0 s" : tempo(tempos[k])) + "</small></td>";
+      variantes.forEach((v, i) => {
+        const n = contagem[v][k] || 0, base = contagem[v].inicio || 0, p = pct(n, base);
+        const queda = !e.opcional && anterior[v] > 0 && n < anterior[v] ? '<div class="queda' + (maiorQueda[v] === k ? " maior" : "") + '">−' + pctTxt(pct(anterior[v] - n, anterior[v])) + "</div>" : "";
+        html += '<td class="num">' + fmt(n) + " <small>(" + pctTxt(p) + ")</small>" + queda + '</td><td><div class="barra" data-dica="<b>' + esc(e.nome) + "</b><br>Versão " + esc(v) + ": " + fmt(n) + " (" + pctTxt(p) + ')"><i style="width:' + Math.min(p, 100).toFixed(1) + "%;background:" + CORES[i % CORES.length] + '"></i></div></td>';
+        if (!e.opcional) anterior[v] = n;
+      });
+      html += "</tr>";
+    }
+    $("funil").innerHTML = html + "</tbody></table>";
+  }
+
+  // Vendas reais da Hub.la por versão (cruzadas pelo link do checkout que cada versão recebeu).
+  // No teste do order bump é isso que decide: o clique no botão é igual nas duas versões, a diferença está no checkout.
+  function vendasHub(d, contagem) {
+    const por = {};
+    for (const l of d.vendas || []) {
+      if (!+l.cliques) continue;
+      const k = l.variante || "?", o = (por[k] = por[k] || { cliques: 0, vendas: 0, bump: 0, receita: 0 });
+      o.cliques += +l.cliques; o.vendas += +l.vendas; o.bump += +l.com_bump; o.receita += +l.receita_principal + +l.receita_bump;
+    }
+    const vs = Object.keys(por).sort();
+    if (!vs.length) return "";
+    const visitas = (v) => (contagem[v] ? contagem[v].inicio || 0 : vs.length === 1 ? Object.values(contagem).reduce((t, c) => t + (c.inicio || 0), 0) : 0);
+    let html = '<h3 class="sub-ab">Vendas na Hub.la</h3><div class="tabela"><table><thead><tr><th>Versão</th><th class="num">Cliques no checkout</th><th class="num">Vendas</th><th class="num">Venda ÷ clique</th><th class="num">Com order bump</th><th class="num">Receita</th><th class="num">Receita por visita</th></tr></thead><tbody>' +
+      vs.map((v) => { const o = por[v], n = visitas(v); return "<tr><td>" + (v === "(todos)" ? "Todas" : rotulo(v)) + '</td><td class="num">' + fmt(o.cliques) + '</td><td class="num"><b>' + fmt(o.vendas) + '</b></td><td class="num">' + pctTxt(pct(o.vendas, o.cliques)) + '</td><td class="num">' + fmt(o.bump) + " <small>(" + pctTxt(pct(o.bump, o.vendas)) + ')</small></td><td class="num">' + reais(o.receita) + '</td><td class="num">' + (n ? reais(o.receita / n) : "—") + "</td></tr>"; }).join("") +
+      "</tbody></table></div>";
+    if (vs.length >= 2) {
+      const taxas = vs.map((v) => ({ v, n: por[v].cliques, c: por[v].vendas, rpc: por[v].cliques ? por[v].receita / por[v].cliques : 0 })).sort((a, b) => pct(b.c, b.n) - pct(a.c, a.n));
+      const [melhor, segundo] = taxas, r = comparar(segundo.c, segundo.n, melhor.c, melhor.n);
+      const pouco = Math.min(melhor.n, segundo.n) < 100 || melhor.c + segundo.c < 20, conf = r ? Math.round(r.conf * 100) : 0, ganhou = !pouco && conf >= 95;
+      const rec = [...taxas].sort((a, b) => b.rpc - a.rpc);
+      html += '<p class="sub nota-ab">' + (ganhou ? "🏆 <b>" + rotulo(melhor.v) + "</b> converte mais no checkout, com " + conf + "% de confiança." : pouco ? "Ainda é cedo: espere pelo menos 100 cliques no checkout e 20 vendas somando as versões." : "Empate técnico em vendas por enquanto (" + conf + "% de confiança).") +
+        " Receita por clique: " + rec.map((t) => "<b>" + esc(t.v) + "</b> " + reais(t.rpc)).join(" · ") + ". Se uma versão vende um pouco menos mas fatura mais por clique (por causa do order bump), ela pode valer mais a pena.</p>";
+    }
+    return html + '<p class="sub nota-ab">Vendas sem reembolso feitas nos links do funil no período. Order bump = outra compra da mesma pessoa até 20 min antes ou depois.</p>';
+  }
+
+  // ---------- mapa de calor ----------
+  // Grade que vem do banco: 40 colunas x 80 linhas, nas proporções da tela do celular (375 x 812) e do cartão da oferta (343 x 542).
+  const GRADE = { nx: 40, ny: 80 };
+  const FUNDOS = {
+    tela: { proporcao: 375 / 812, nota: "Fundo ilustrativo: a conversa muda a cada momento; o mapa mostra em que parte da tela as pessoas tocam. Só visitas no celular.",
+      blocos: [["topo-tela", 0, 0, 1, 0.079, "Central de Voos"], ["linha-cinza", 0.17, 0.13, 0.42, 0.05, ""], ["linha-cinza", 0.17, 0.2, 0.72, 0.09, "mensagens do Henrique"], ["linha-cinza", 0.17, 0.31, 0.62, 0.07, ""],
+        ["escura", 0.62, 0.42, 0.33, 0.06, "resposta"], ["linha-cinza", 0.17, 0.52, 0.72, 0.12, ""], ["contorno", 0.2, 0.7, 0.36, 0.06, "botões"], ["contorno", 0.6, 0.7, 0.36, 0.06, ""], ["contorno", 0.2, 0.78, 0.36, 0.06, ""], ["contorno", 0.6, 0.78, 0.36, 0.06, ""]] },
+    oferta: { proporcao: 343 / 542, nota: "Toques dentro do cartão da oferta (os blocos estão na posição real do cartão no celular).",
+      blocos: [["linha-cinza", 0, 0, 1, 0.166, "Comunidade VIP · 55% OFF"], ["contorno", 0.061, 0.19, 0.878, 0.2, "De R$ 67,06 por R$ 30,18/mês"], ["contorno", 0.061, 0.406, 0.878, 0.132, "Cupom"], ["escura", 0.693, 0.431, 0.214, 0.081, "Copiar"],
+        ["contorno", 0.061, 0.568, 0.878, 0.083, "Tempo do cupom"], ["escura", 0.061, 0.676, 0.878, 0.115, "Entrar para o VIP"], ["contorno", 0.061, 0.821, 0.878, 0.14, "Garantia de 7 dias"]] },
+  };
+  // Rampa de um tom só (laranja), do claro (poucos toques) ao escuro (muitos).
+  const RAMPA = [[254, 215, 170], [251, 146, 60], [234, 88, 12], [154, 52, 18]];
+  const corDaRampa = (t) => { const s = Math.min(Math.max(t, 0), 1) * (RAMPA.length - 1), i = Math.min(Math.floor(s), RAMPA.length - 2), f = s - i; return RAMPA[i].map((c, k) => Math.round(c + (RAMPA[i + 1][k] - c) * f)); };
+  let tipoCalor = "tela";
+  function mapaDeCalor(d) {
+    const fundo = FUNDOS[tipoCalor], quadro = $("calorQuadro");
+    const pontos = (d.toques || []).filter((t) => t.tipo === tipoCalor).map((t) => ({ gx: +t.gx, gy: +t.gy, n: +t.toques, raiva: +t.raiva }));
+    const total = pontos.reduce((s, p) => s + p.n, 0);
+    quadro.className = "calor-quadro " + tipoCalor;
+    quadro.style.aspectRatio = String(fundo.proporcao);
+    quadro.innerHTML = fundo.blocos.map(([cls, x, y, w, h, txt]) => '<div class="esq ' + cls + '" style="left:' + x * 100 + "%;top:" + y * 100 + "%;width:" + w * 100 + "%;height:" + h * 100 + '%">' + esc(txt) + "</div>").join("") + '<canvas aria-hidden="true"></canvas>';
+    const canvas = quadro.querySelector("canvas");
+    $("calorLegenda").innerHTML = '<div class="calor-escala"><small>menos</small><i></i><small>mais toques</small></div>' + fmt(total) + " toques no período. " + esc(fundo.nota);
+    requestAnimationFrame(() => desenharCalor(canvas, pontos));
+    canvas.addEventListener("mousemove", (e) => (canvas.dataset.dica = dicaDoPonto(canvas, pontos, total, e)));
+    canvas.addEventListener("touchstart", (e) => (canvas.dataset.dica = dicaDoPonto(canvas, pontos, total, e.touches[0])), { passive: true });
+    listaDeToques(d);
+  }
+  function desenharCalor(canvas, pontos) {
+    const dpr = window.devicePixelRatio || 1, W = Math.round(canvas.clientWidth * dpr), H = Math.round(canvas.clientHeight * dpr);
+    if (!W || !H) return;
+    canvas.width = W; canvas.height = H;
+    if (!pontos.length) return;
+    // 1) acumula a intensidade em tons de cinza (alfa); 2) pinta cada pixel com a cor da rampa.
+    const sombra = document.createElement("canvas"); sombra.width = W; sombra.height = H;
+    const s = sombra.getContext("2d"), max = Math.max(...pontos.map((p) => p.n)), raio = Math.max(W, H) * 0.055;
+    for (const p of pontos) {
+      const x = ((p.gx + 0.5) / GRADE.nx) * W, y = ((p.gy + 0.5) / GRADE.ny) * H, a = 0.18 + 0.82 * (p.n / max);
+      const g = s.createRadialGradient(x, y, 0, x, y, raio);
+      g.addColorStop(0, "rgba(0,0,0," + a + ")"); g.addColorStop(1, "rgba(0,0,0,0)");
+      s.fillStyle = g; s.fillRect(x - raio, y - raio, raio * 2, raio * 2);
+    }
+    const img = s.getImageData(0, 0, W, H), px = img.data;
+    for (let i = 0; i < px.length; i += 4) {
+      const a = px[i + 3] / 255;
+      if (a < 0.02) { px[i + 3] = 0; continue; }
+      const [r, g, b] = corDaRampa(a);
+      px[i] = r; px[i + 1] = g; px[i + 2] = b; px[i + 3] = Math.round(Math.min(1, 0.25 + a) * 0.85 * 255);
+    }
+    canvas.getContext("2d").putImageData(img, 0, 0);
+  }
+  function dicaDoPonto(canvas, pontos, total, e) {
+    const r = canvas.getBoundingClientRect(), gx = ((e.clientX - r.left) / r.width) * GRADE.nx, gy = ((e.clientY - r.top) / r.height) * GRADE.ny;
+    const perto = pontos.filter((p) => Math.abs(p.gx + 0.5 - gx) <= 3 && Math.abs(p.gy + 0.5 - gy) <= 3);
+    const n = perto.reduce((s, p) => s + p.n, 0), raiva = perto.reduce((s, p) => s + p.raiva, 0);
+    return n ? "<b>" + fmt(n) + " toques</b> nesta região<br>" + pctTxt(pct(n, total)) + " de todos os toques" + (raiva ? "<br>" + fmt(raiva) + " toques de raiva" : "") : "Nenhum toque aqui";
+  }
+  function listaDeToques(d) {
+    const alvos = (d.toques || []).filter((t) => t.tipo === "alvo").map((t) => ({ nome: t.chave, n: +t.toques, s: +t.sessoes, uteis: +t.uteis, raiva: +t.raiva })).sort((a, b) => b.n - a.n);
+    const total = alvos.reduce((s, a) => s + a.n, 0);
+    if (!total) { $("calorLista").innerHTML = '<div class="vazio peq">Ainda não há toques registrados nesse período.</div>'; return; }
+    const mortos = alvos.filter((a) => !a.uteis).reduce((s, a) => s + a.n, 0), raiva = alvos.reduce((s, a) => s + a.raiva, 0);
+    $("calorLista").innerHTML = '<p class="calor-resumo"><b>' + pctTxt(pct(mortos, total)) + "</b> dos toques foram em coisas que não são botão" + (raiva ? " · <b>" + fmt(raiva) + "</b> toques de raiva (3 toques rápidos no mesmo lugar)" : "") + ".</p>" +
+      '<div class="tabela"><table><thead><tr><th>O que foi tocado</th><th class="num">Toques</th><th class="num">Pessoas</th></tr></thead><tbody>' +
+      alvos.slice(0, 14).map((a) => "<tr><td>" + esc(a.nome) + (!a.uteis ? '<span class="tag-morto">não é botão</span>' : "") + (a.raiva ? '<span class="tag-raiva">' + fmt(a.raiva) + " de raiva</span>" : "") + '</td><td class="num">' + fmt(a.n) + " <small>(" + pctTxt(pct(a.n, total)) + ')</small></td><td class="num">' + fmt(a.s) + "</td></tr>").join("") +
+      "</tbody></table></div>";
+  }
+  $("abasCalor").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-tipo]"); if (!b) return;
+    tipoCalor = b.dataset.tipo;
+    [...$("abasCalor").children].forEach((x) => x.setAttribute("aria-selected", x === b ? "true" : "false"));
+    if (ultimo) mapaDeCalor(ultimo);
+  });
+  window.addEventListener("resize", () => { if (ultimo) mapaDeCalor(ultimo); });
+
+  function respostas(d) {
+    const por = {};
+    for (const r of d.respostas || []) (por[r.pergunta] = por[r.pergunta] || []).push({ valor: r.valor, n: +r.sessoes });
+    $("respostas").innerHTML = PERGUNTAS.map(([id, titulo]) => {
+      const lista = (por[id] || []).sort((a, b) => b.n - a.n), total = lista.reduce((t, x) => t + x.n, 0);
+      if (!lista.length) return '<div class="pergunta"><h3>' + titulo + '</h3><div class="vazio peq">Sem respostas ainda.</div></div>';
+      const mostra = lista.slice(0, 8), resto = lista.slice(8).reduce((t, x) => t + x.n, 0);
+      if (resto) mostra.push({ valor: "Outros (" + (lista.length - 8) + ")", n: resto });
+      return '<div class="pergunta"><h3>' + titulo + "</h3>" + mostra.map((x) => {
+        const p = pct(x.n, total);
+        return '<div class="opcao-resp" data-dica="<b>' + esc(x.valor) + "</b><br>" + fmt(x.n) + " pessoas · " + pctTxt(p) + '"><span class="nome">' + esc(x.valor) + '</span><span class="val">' + pctTxt(p) + " · " + fmt(x.n) + '</span><div class="barra"><i style="width:' + p.toFixed(1) + '%"></i></div></div>';
+      }).join("") + "</div>";
+    }).join("");
+  }
+
+  let tipoTrafego = "fonte", ultimo = null;
+  function trafego(d) {
+    const linhas = (d.segmentos || []).filter((s) => s.tipo === tipoTrafego && +s.visitas > 0).sort((a, b) => b.visitas - a.visitas).slice(0, 12);
+    if (!linhas.length) { $("trafego").innerHTML = '<div class="vazio peq">Sem visitas com esse dado no período.</div>'; return; }
+    $("trafego").innerHTML = '<table><thead><tr><th>' + { fonte: "Origem", campanha: "Campanha", anuncio: "Anúncio" }[tipoTrafego] + '</th><th class="num">Visitas</th><th class="num">Viu a oferta</th><th class="num">Checkout</th></tr></thead><tbody>' +
+      linhas.map((s) => "<tr><td>" + esc(s.valor) + '</td><td class="num">' + fmt(s.visitas) + '</td><td class="num">' + pctTxt(pct(s.ofertas, s.visitas)) + ' <small>(' + fmt(s.ofertas) + ')</small></td><td class="num"><b>' + pctTxt(pct(s.checkouts, s.visitas)) + "</b> <small>(" + fmt(s.checkouts) + ")</small></td></tr>").join("") + "</tbody></table>";
+  }
+  $("abasTrafego").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-tipo]"); if (!b) return;
+    tipoTrafego = b.dataset.tipo;
+    [...$("abasTrafego").children].forEach((x) => x.setAttribute("aria-selected", x === b ? "true" : "false"));
+    if (ultimo) trafego(ultimo);
+  });
+
+  function dispositivosEHoras(d) {
+    const seg = d.segmentos || [];
+    const disp = seg.filter((s) => s.tipo === "dispositivo" && +s.visitas > 0).sort((a, b) => b.visitas - a.visitas);
+    const totalV = disp.reduce((t, s) => t + +s.visitas, 0);
+    $("dispositivos").innerHTML = disp.length ? disp.map((s) => '<div class="disp"><span>' + (s.valor === "celular" ? "📱 Celular" : s.valor === "computador" ? "💻 Computador" : esc(s.valor)) + " <small>· " + pctTxt(pct(s.visitas, totalV)) + ' das visitas</small></span><span><b>' + fmt(s.visitas) + "</b> <small>· checkout " + pctTxt(pct(s.checkouts, s.visitas)) + "</small></span></div>").join("") : '<div class="vazio peq">Sem visitas no período.</div>';
+    const horas = Array.from({ length: 24 }, (_, h) => { const s = seg.find((x) => x.tipo === "hora" && +x.valor === h); return { h, v: s ? +s.visitas : 0, c: s ? +s.checkouts : 0 }; });
+    const max = Math.max(1, ...horas.map((x) => x.v));
+    $("horas").innerHTML = horas.some((x) => x.v) ? '<div class="colunas" style="height:120px">' + horas.map((x) => '<div class="col" data-dica="<b>' + String(x.h).padStart(2, "0") + "h</b><br>" + fmt(x.v) + " visitas<br>" + fmt(x.c) + ' checkouts"><i style="height:' + ((x.v / max) * 100).toFixed(1) + '%"></i></div>').join("") + '</div><div class="eixo"><span>00h</span><span>06h</span><span>12h</span><span>18h</span><span>23h</span></div>' : '<div class="vazio peq">Sem visitas no período.</div>';
+  }
+
+  async function carregar() {
+    const q = new URLSearchParams({ dias: $("dias").value });
+    if (FUNIL === "diagnostico2") q.set("funil", "diagnostico2");
+    if ($("experimento").value) q.set("experimento", $("experimento").value);
+    if ($("fonte").value) q.set("fonte", $("fonte").value);
+    if ($("teste").checked) q.set("teste", "1");
+    try {
+      const r = await fetch(API + "?" + q.toString(), { cache: "no-store" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      ultimo = await r.json();
+      preencherFiltros(ultimo.filtros || []);
+      kpis(ultimo); serie(ultimo); funilEab(ultimo); mapaDeCalor(ultimo); respostas(ultimo); trafego(ultimo); dispositivosEHoras(ultimo);
+      $("rodape").textContent = "Atualizado às " + new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) + " · atualiza sozinho a cada minuto";
+      $("rodape").classList.remove("erro");
+    } catch (e) {
+      $("rodape").textContent = "Não consegui carregar as métricas (" + e.message + "). Tento de novo em 1 minuto.";
+      $("rodape").classList.add("erro");
+    }
+  }
+  ["dias", "experimento", "fonte", "teste"].forEach((id) => $(id).addEventListener("change", carregar));
+  carregar();
+  setInterval(carregar, 60000);
+</script>
+</body>
+</html>

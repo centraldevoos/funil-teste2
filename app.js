@@ -23,7 +23,7 @@
     return n.charAt(0).toUpperCase() + n.slice(1).toLowerCase();
   })();
   // Funil frio (?f=voar): quem comentou VOAR na live do Instagram e não conhece o grupo gratuito.
-  // Venda direta do VIP; quem travar ou não comprar recebe o link do grupo gratuito depois de 90 s.
+  // Venda direta do VIP; quem travar ou não comprar recebe o link do grupo gratuito depois de 2 min.
   const FRIO = params.get("f") === "voar" || C.FUNIL === "voar";
   let TOTAL = 8;
   const dados ={ nome: "", ondeCompra: "", milhas: "", destino: null, quando: null, pessoas: 1, origem: null };
@@ -1385,7 +1385,7 @@
         await ele("Caramba, ainda não? Você ta deixando de viajar de graça por isso");
       }
       await ele("mas tudo bem, conseguimos te ajudar");
-      await ele(FRIO ? "na nossa *Comunidade VIP*, que é o nosso grupo de promoções no WhatsApp, você compra as passagens no Cartão ou PIX, sem ter milhas" : "na nossa Comunidade VIP você pode comprar as passagens usando Cartão ou PIX, sem ter milhas");
+      await ele(FRIO ? "na nossa *Comunidade VIP* no WhatsApp, você compra as passagens no Cartão ou PIX, sem ter milhas" : "na nossa Comunidade VIP você pode comprar as passagens usando Cartão ou PIX, sem ter milhas");
       await ele("isso é incrível né? 😁");
       await opcoes([{ texto: "SIM vou viajar muito", principal: true }]);
       etapa(3);
@@ -1604,19 +1604,19 @@
         await ele("Caso tenha alguma dúvida, me avisa aqui!");
       });
     });
-    // Funil frio: lembrete em 60 s, grupo gratuito em 90 s (se não clicou no VIP) e dúvidas em 150 s.
+    // Funil frio: lembrete em 60 s, grupo gratuito em 2 min (se não clicou no VIP) e dúvidas em 3 min.
     setTimeout(() => emFila(async () => {
       if (clicou) return;
       await ele(CUPOM_APLICADO ? "Lembrando que esse desconto é exclusivo e só fica liberado por *poucos minutos*. O cupom já está aplicado no link, é só finalizar!" : "Lembrando que esse desconto é exclusivo e só fica liberado por *poucos minutos*, não esqueça de aplicar o CUPOM!");
       await ele("depois você só consegue comprar o acesso quando abrirmos as vagas novamente e com o valor normal 🙁");
     }), (FRIO ? 60000 : 90000) * ritmo);
-    if (FRIO) setTimeout(() => emFila(() => (clicou ? null : oferecerGrupo("nao_comprou"))), 90000 * ritmo);
-    setTimeout(() => emFila(() => duvidas(cta)), (FRIO ? 150000 : 120000) * ritmo);
+    if (FRIO) setTimeout(() => emFila(() => (clicou ? null : oferecerGrupo("nao_comprou"))), 120000 * ritmo);
+    setTimeout(() => emFila(() => duvidas(cta)), (FRIO ? 180000 : 120000) * ritmo);
   }
 
   // ---------- funil frio: o grupo gratuito como segunda opção ----------
-  // Aparece uma vez só: se a pessoa ficar 90 s parada numa pergunta (ou sair e voltar depois disso), ou se
-  // não clicar no VIP em 90 s depois da oferta. O link é o do grupo gratuito (LINK_GRUPO_GRATIS), com as UTMs.
+  // Aparece uma vez só: se a pessoa ficar 2 min parada numa pergunta (ou sair e voltar depois disso), ou se
+  // não clicar no VIP em 2 min depois da oferta. O link é o do grupo gratuito (LINK_GRUPO_GRATIS), com as UTMs.
   let grupoOferecido = false, ofertaNaTela = false;
   async function oferecerGrupo(motivo) {
     if (!FRIO || grupoOferecido || !C.LINK_GRUPO_GRATIS) return;
@@ -1657,7 +1657,7 @@
       const atual = [...conversa.querySelectorAll(".campo, .opcoes, .bf-cartao.tocavel")].find((el) => !el.querySelector(".grupo-gratis"));
       if (!atual) { emAberto = null; return; }
       if (atual !== emAberto) { emAberto = atual; desde = Date.now(); }
-      if (Date.now() - Math.max(desde, ultimoMovimento) >= 90000 * ritmo) oferecerGrupo("parou_no_meio");
+      if (Date.now() - Math.max(desde, ultimoMovimento) >= 120000 * ritmo) oferecerGrupo("parou_no_meio");
     }, 2000);
   }
 
