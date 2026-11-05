@@ -7,9 +7,9 @@ window.CONFIG = {
 
   // Link do checkout do VIP na Hub.la (o padrão, sem order bump). O teste "orderbump-v1" abaixo troca o link por versão.
   // Vazio = botão mostra um aviso.
-  LINK_CHECKOUT: "https://pay.hub.la/qhHtgSpZBbPMFaVspJvT?coupon=BOASVINDAS",
-  CUPOM: "BOASVINDAS",
-  // O link do checkout já vem com o cupom aplicado (?coupon=BOASVINDAS): os textos dizem "cupom aplicado".
+  LINK_CHECKOUT: "https://pay.hub.la/o3IjM8S2Shbp3YJI3Owv",
+  CUPOM: "BLACK",
+  // Link padrão: o checkout sem cupom (de R$ 3.058 por R$ 397). O teste "cupom-v1" troca pelo link com o cupom BLACK.
   CUPOM_APLICADO: true,
   // Funil frio (?f=voar, live do Instagram): página de entrada no grupo gratuito, oferecida a quem trava no meio
   // ou não compra em 90 s. Vazio = não oferece.
@@ -43,6 +43,8 @@ window.CONFIG = {
     carlosSantiago: "midia/fluxo/carlosSantiago.jpg",
     julianaEgito: "midia/fluxo/julianaEgito.jpg",
     comoAplicarCupom: "midia/fluxo/comoAplicarCupom.jpg",
+    // Black a R$ 397 (05/11/2026): a mesma arte do fluxo do DataCrazy, "quanto custaria ter tudo isso por 1 ano".
+    tabela397: "midia/fluxo/tabela-397.jpg",
   },
 
   // Promoção no fim do funil (o "print" do WhatsApp com a promoção pro destino da pessoa).
@@ -59,7 +61,18 @@ window.CONFIG = {
   // O que pode mudar: abertura (lista de mensagens, uma bolha cada), abertura1, abertura2, botaoAbertura,
   // perguntaDestino ({nome} vira o nome da pessoa), bonusTitulo, botaoOferta e linkCheckout.
   // Pra ver uma versão: ?v=B força o primeiro teste; ?v_NOME=B força um teste pelo nome (ex.: ?v_orderbump-v1=B).
-  EXPERIMENTOS: [],
+  EXPERIMENTOS: [
+    // Desde 05/11/2026: Black a R$ 397, 2 anos. A = sem cupom (o checkout já mostra de R$ 3.058 por R$ 397);
+    // B = cupom BLACK já aplicado no link. O painel separa as vendas pelo link de cada versão.
+    {
+      nome: "cupom-v1",
+      pesos: { A: 50, B: 50 },
+      variantes: {
+        A: { linkCheckout: "https://pay.hub.la/o3IjM8S2Shbp3YJI3Owv" },
+        B: { linkCheckout: "https://pay.hub.la/WKYYwK2YG3UFQOIYs8OY?coupon=BLACK", cupomAplicado: "sim" },
+      },
+    },
+  ],
 
   PROMOS_FONTE: "simulada",
   PROMOS_API_URL: "",
